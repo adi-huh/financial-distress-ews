@@ -46,3 +46,8 @@ htmlcov/
 # Temporary files
 *.tmp
 temp/
+
+# Local planning documents (not pushed)
+30-DAY-PUSH-PLAN.md
+GITHUB-PUSH-LOG.md
+
