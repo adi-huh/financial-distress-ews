@@ -438,9 +438,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: [Wiki](https://github.com/yourusername/financial-distress-ews/wiki)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/financial-distress-ews/issues)
-- **Email**: support@yourcompany.com
+- **Documentation**: [Wiki](https://github.com/adi-huh/financial-distress-ews/wiki)
+- **Issues**: [GitHub Issues](https://github.com/adi-huh/financial-distress-ews/issues)
+- **Email**: raiaditya126@gmail.com
 
 ---
 
