@@ -9,17 +9,15 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
-
-from data_ingestion.loader import DataLoader
-from preprocessing.cleaner import DataCleaner
-from ratio_engine.ratios import FinancialRatioEngine
-from analytics.timeseries import TimeSeriesAnalyzer
-from anomaly_detection.zscore import ZScoreDetector
-from risk_score.score import RiskScoreEngine
-from consulting.recommend import ConsultingEngine
-from visualization.charts import ChartGenerator
+# Import core modules (flat structure)
+from loader import DataLoader
+from cleaner import DataCleaner
+from ratios import FinancialRatioEngine
+from timeseries import TimeSeriesAnalyzer
+from zscore import AnomalyDetectionEngine
+from score import RiskScoreEngine
+from recommend import ConsultingEngine
+from charts import ChartGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -130,17 +128,23 @@ def main():
         
         # Step 5: Anomaly Detection
         logger.info(f"Detecting anomalies using {args.anomaly_method}...")
-        if args.anomaly_method == 'zscore':
-            detector = ZScoreDetector(threshold=3.0)
-            anomalies = detector.detect_anomalies(ratios_df)
-            logger.info(f"✓ Detected {len(anomalies)} anomalies")
+        use_zscore = args.anomaly_method == 'zscore'
+        use_if = args.anomaly_method == 'isolation_forest'
+        detector = AnomalyDetectionEngine(
+            use_zscore=use_zscore,
+            use_isolation_forest=use_if,
+            zscore_threshold=3.0
+        )
+        all_anomalies = detector.detect_all_anomalies(ratios_df)
+        # Extract the anomalies from the selected method
+        anomalies = all_anomalies.get(args.anomaly_method, pd.DataFrame())
+        logger.info(f"✓ Detected {len(anomalies)} anomalies")
         
         # Step 6: Calculate Risk Score
         logger.info("Computing composite risk score...")
         risk_engine = RiskScoreEngine()
         risk_results = risk_engine.calculate_risk_score(ratios_df, anomalies)
-        logger.info(f"✓ Risk score calculated: {risk_results['overall_score']:.2f}/100")
-        logger.info(f"✓ Classification: {risk_results['classification']}")
+        logger.info(f"✓ Risk scores calculated for {len(risk_results)} companies")
         
         # Step 7: Generate Recommendations
         logger.info("Generating strategic recommendations...")
@@ -181,14 +185,20 @@ def main():
         print("\n" + "=" * 70)
         print("ANALYSIS SUMMARY")
         print("=" * 70)
-        print(f"Company: {args.company if args.company else 'All companies'}")
+        print(f"Companies Analyzed: {len(risk_results)}")
         print(f"Period: {clean_data['year'].min()} - {clean_data['year'].max()}")
-        print(f"Risk Score: {risk_results['overall_score']:.2f}/100")
-        print(f"Classification: {risk_results['classification']}")
         print(f"Anomalies Detected: {len(anomalies)}")
+        
+        # Print risk scores for each company
+        print("\nRisk Scores by Company:")
+        for company, scores in risk_results.items():
+            print(f"  {company}: {scores['overall_score']:.2f}/100 ({scores['classification']})")
+        
         print("\nTop Recommendations:")
-        for i, rec in enumerate(recommendations[:5], 1):
-            print(f"{i}. {rec}")
+        for i, (company, rec_data) in enumerate(list(recommendations.items())[:3], 1):
+            print(f"{i}. {company} ({rec_data['classification']}):")
+            if rec_data.get('immediate_actions'):
+                print(f"   Immediate: {rec_data['immediate_actions'][0]}")
         print("=" * 70)
         
         logger.info("Analysis completed successfully!")
