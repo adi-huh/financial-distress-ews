@@ -48,6 +48,12 @@ htmlcov/
 temp/
 
 # Local planning documents (not pushed)
+
+# Annual reports and large files (training data)
+annual_reports_2024/
+*.pdf
+extracted_text.txt
+*.log
 30-DAY-PUSH-PLAN.md
 GITHUB-PUSH-LOG.md
 
