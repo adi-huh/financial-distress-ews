@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Financial Distress EWS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold mb-2">Dashboard</h1>
+            <p class="text-muted">Welcome back! Here's your financial analysis overview.</p>
+        </div>
+    </div>
+
+    <!-- Statistics Row -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-number" id="stat-companies">0</div>
+                <small class="text-muted">Companies</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="stat-number" id="stat-analyses">0</div>
+                <small class="text-muted">Analyses</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card danger">
+                <div class="stat-number" id="stat-high-risk">0</div>
+                <small class="text-muted">High Risk</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card warning">
+                <div class="stat-number" id="stat-anomalies">0</div>
+                <small class="text-muted">Anomalies Detected</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="/dashboard/upload" class="btn btn-primary me-2">
+                        <i class="bi bi-cloud-upload"></i> Upload Financial Data
+                    </a>
+                    <a href="/dashboard/companies" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-plus-circle"></i> Add Company
+                    </a>
+                    <a href="/dashboard/analysis" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-play-circle"></i> Run Analysis
+                    </a>
+                    <a href="/dashboard/reports" class="btn btn-outline-primary">
+                        <i class="bi bi-download"></i> Export Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Risk Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="riskChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Analysis Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Analysis -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Analyses</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Analysis Date</th>
+                                    <th>Risk Score</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentAnalysesTable">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">Loading analyses...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load dashboard data on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            showLoading();
+            
+            // Fetch statistics
+            const statsResponse = await axios.get('/api/statistics');
+            const stats = statsResponse.data.statistics;
+            
+            // Update statistics
+            document.getElementById('stat-companies').textContent = stats.total_companies || 0;
+            document.getElementById('stat-analyses').textContent = stats.total_analyses || 0;
+            document.getElementById('stat-high-risk').textContent = stats.high_risk_count || 0;
+            document.getElementById('stat-anomalies').textContent = stats.anomaly_count || 0;
+            
+            // Load recent analyses
+            const analysesResponse = await axios.get('/api/statistics');
+            const analyses = analysesResponse.data.recent_analyses || [];
+            
+            const tbody = document.getElementById('recentAnalysesTable');
+            tbody.innerHTML = '';
+            
+            if (analyses.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No analyses yet</td></tr>';
+            } else {
+                analyses.forEach(analysis => {
+                    const row = document.createElement('tr');
+                    const riskLevel = getRiskLevel(analysis.risk_score);
+                    const riskBadge = getRiskBadge(analysis.risk_score);
+                    
+                    row.innerHTML = `
+                        <td><strong>${analysis.company_name}</strong></td>
+                        <td>${new Date(analysis.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <span class="badge ${riskBadge}">
+                                ${(analysis.risk_score || 0).toFixed(2)}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">Completed</span>
+                        </td>
+                        <td>
+                            <a href="/dashboard/analysis/${analysis.id}" class="btn btn-sm btn-outline-primary">
+                                View Details
+                            </a>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+            
+            // Initialize charts
+            initializeCharts();
+            
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    function getRiskLevel(score) {
+        if (score >= 7) return 'high';
+        if (score >= 4) return 'medium';
+        return 'low';
+    }
+
+    function getRiskBadge(score) {
+        if (score >= 7) return 'badge-risk-high';
+        if (score >= 4) return 'badge-risk-medium';
+        return 'badge-risk-low';
+    }
+
+    function initializeCharts() {
+        // Risk Distribution Chart
+        const riskCtx = document.getElementById('riskChart').getContext('2d');
+        new Chart(riskCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['High Risk', 'Medium Risk', 'Low Risk'],
+                datasets: [{
+                    data: [12, 19, 14],
+                    backgroundColor: ['#dc3545', '#ffc107', '#198754'],
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Status Chart
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Completed', 'In Progress', 'Pending'],
+                datasets: [{
+                    label: 'Analyses',
+                    data: [25, 8, 3],
+                    backgroundColor: ['#198754', '#0dcaf0', '#ffc107'],
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 5
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

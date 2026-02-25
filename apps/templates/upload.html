@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Financial Data - Financial Distress EWS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold mb-2">Upload Financial Data</h1>
+            <p class="text-muted">Upload PDF financial statements or CSV data for analysis</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Upload Form -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Upload Files</h5>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm">
+                        <!-- Company Selection -->
+                        <div class="mb-3">
+                            <label for="company" class="form-label">Select Company</label>
+                            <select class="form-select" id="company" name="company_id" required>
+                                <option value="">Choose a company...</option>
+                            </select>
+                        </div>
+
+                        <!-- File Upload -->
+                        <div class="mb-3">
+                            <label for="fileUpload" class="form-label">Select File</label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="fileUpload" name="file" 
+                                       accept=".pdf,.csv,.xlsx" required>
+                                <span class="input-group-text">PDF, CSV, or XLSX</span>
+                            </div>
+                            <small class="text-muted">Maximum file size: 50MB</small>
+                        </div>
+
+                        <!-- Analysis Type -->
+                        <div class="mb-3">
+                            <label for="analysisType" class="form-label">Analysis Type</label>
+                            <select class="form-select" id="analysisType" name="analysis_type">
+                                <option value="general">General Financial Analysis</option>
+                                <option value="ratio">Ratio Analysis</option>
+                                <option value="risk">Risk Assessment</option>
+                                <option value="trend">Trend Analysis</option>
+                                <option value="full">Full Comprehensive Analysis</option>
+                            </select>
+                        </div>
+
+                        <!-- Fiscal Year -->
+                        <div class="mb-3">
+                            <label for="fiscalYear" class="form-label">Fiscal Year</label>
+                            <input type="number" class="form-control" id="fiscalYear" name="fiscal_year" 
+                                   min="2000" max="2050" placeholder="e.g., 2024">
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="mb-3" id="progressContainer" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="uploadProgress" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small id="progressText" class="text-muted">Uploading...</small>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="uploadBtn">
+                                <i class="bi bi-cloud-upload"></i> Upload & Analyze
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Recent Uploads -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Uploads</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>File Name</th>
+                                    <th>Company</th>
+                                    <th>Upload Date</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentUploadsTable">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">Loading uploads...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <div class="col-lg-4">
+            <!-- Upload Tips -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Upload Tips
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="small">
+                        <li>Supported formats: PDF, CSV, XLSX</li>
+                        <li>Maximum file size: 50MB</li>
+                        <li>Ensure data is from official financial statements</li>
+                        <li>Include balance sheet, income statement, cash flow</li>
+                        <li>Data must be for a complete fiscal period</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Supported Metrics -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-checklist"></i> Supported Metrics
+                    </h5>
+                </div>
+                <div class="card-body small">
+                    <strong>Balance Sheet:</strong>
+                    <p class="mb-2">Assets, Liabilities, Equity, Current Ratio</p>
+                    
+                    <strong>Income Statement:</strong>
+                    <p class="mb-2">Revenue, EBITDA, Net Income, Margins</p>
+                    
+                    <strong>Cash Flow:</strong>
+                    <p>Operating CF, Investing CF, Financing CF</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load companies on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            const response = await axios.get('/api/companies');
+            const companies = response.data.companies;
+            
+            const select = document.getElementById('company');
+            companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading companies:', error);
+        }
+    });
+
+    // Handle form submission
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('fileUpload');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert('Please select a file');
+            return;
+        }
+
+        // Check file size (50MB max)
+        if (file.size > 50 * 1024 * 1024) {
+            alert('File size exceeds 50MB limit');
+            return;
+        }
+
+        // Create FormData
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('company_id', document.getElementById('company').value);
+        formData.append('analysis_type', document.getElementById('analysisType').value);
+        formData.append('fiscal_year', document.getElementById('fiscalYear').value);
+
+        try {
+            showLoading();
+            
+            // Show progress bar
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('uploadProgress').style.width = '0%';
+
+            // Upload file
+            const response = await axios.post('/api/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round(
+                        (progressEvent.loaded * 100) / progressEvent.total
+                    );
+                    document.getElementById('uploadProgress').style.width = percentCompleted + '%';
+                    document.getElementById('progressText').textContent = 
+                        `Uploading: ${percentCompleted}% (${formatFileSize(progressEvent.loaded)} / ${formatFileSize(progressEvent.total)})`;
+                }
+            });
+
+            // Update progress
+            document.getElementById('uploadProgress').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Processing analysis...';
+
+            // Show success message
+            alert('File uploaded successfully! Analysis started.');
+            
+            // Reset form
+            document.getElementById('uploadForm').reset();
+            document.getElementById('progressContainer').style.display = 'none';
+            
+            // Reload recent uploads
+            loadRecentUploads();
+            
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            alert('Error uploading file: ' + (error.response?.data?.error || error.message));
+        } finally {
+            hideLoading();
+        }
+    });
+
+    async function loadRecentUploads() {
+        try {
+            const response = await axios.get('/api/uploads');
+            const uploads = response.data.uploads || [];
+            
+            const tbody = document.getElementById('recentUploadsTable');
+            tbody.innerHTML = '';
+            
+            if (uploads.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No uploads yet</td></tr>';
+            } else {
+                uploads.forEach(upload => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${upload.filename}</td>
+                        <td>${upload.company_name}</td>
+                        <td>${new Date(upload.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <span class="badge ${getStatusBadge(upload.status)}">
+                                ${upload.status}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/dashboard/upload/${upload.id}" class="btn btn-sm btn-outline-primary">
+                                View
+                            </a>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading uploads:', error);
+        }
+    }
+
+    function getStatusBadge(status) {
+        switch(status) {
+            case 'completed': return 'bg-success';
+            case 'processing': return 'bg-info';
+            case 'failed': return 'bg-danger';
+            default: return 'bg-secondary';
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // Load recent uploads on page load
+    loadRecentUploads();
+</script>
+{% endblock %}

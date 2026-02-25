@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+
+{% block title %}Risk Dashboard - Financial Distress EWS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold mb-2">Risk Dashboard</h1>
+            <p class="text-muted">Monitor financial distress risk across all companies</p>
+        </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Risk Level</label>
+                            <select class="form-select" id="riskFilterLevel">
+                                <option value="">All Risk Levels</option>
+                                <option value="high">High Risk</option>
+                                <option value="medium">Medium Risk</option>
+                                <option value="low">Low Risk</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Industry</label>
+                            <select class="form-select" id="riskFilterIndustry">
+                                <option value="">All Industries</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Country</label>
+                            <select class="form-select" id="riskFilterCountry">
+                                <option value="">All Countries</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Matrix -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Risk Score Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="riskMatrixChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Metrics Row -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card danger">
+                <div class="stat-number" id="high-risk-count">0</div>
+                <small class="text-muted">High Risk Companies</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card warning">
+                <div class="stat-number" id="medium-risk-count">0</div>
+                <small class="text-muted">Medium Risk Companies</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card success">
+                <div class="stat-number" id="low-risk-count">0</div>
+                <small class="text-muted">Low Risk Companies</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- High Risk Alert -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> High Risk Companies
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Ticker</th>
+                                    <th>Industry</th>
+                                    <th>Risk Score</th>
+                                    <th>Key Indicators</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="highRiskTable">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Factors Breakdown -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Top Risk Factors</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush" id="riskFactorsList">
+                        <div class="text-center text-muted">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Risk Score Trends</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="riskTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allCompanies = [];
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            showLoading();
+            
+            // Load companies and risk data
+            const companiesResponse = await axios.get('/api/companies?limit=100');
+            allCompanies = companiesResponse.data.companies;
+            
+            // Populate filters
+            populateFilters();
+            
+            // Load risk data
+            await loadRiskData();
+            
+            // Initialize charts
+            initializeRiskCharts();
+            
+        } catch (error) {
+            console.error('Error loading risk dashboard:', error);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    function populateFilters() {
+        // Get unique industries and countries
+        const industries = new Set();
+        const countries = new Set();
+        
+        allCompanies.forEach(company => {
+            if (company.industry) industries.add(company.industry);
+            if (company.country) countries.add(company.country);
+        });
+        
+        // Populate industry filter
+        const industrySelect = document.getElementById('riskFilterIndustry');
+        industries.forEach(industry => {
+            const option = document.createElement('option');
+            option.value = industry;
+            option.textContent = industry;
+            industrySelect.appendChild(option);
+        });
+        
+        // Populate country filter
+        const countrySelect = document.getElementById('riskFilterCountry');
+        countries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country;
+            option.textContent = country;
+            countrySelect.appendChild(option);
+        });
+    }
+
+    async function loadRiskData() {
+        try {
+            const response = await axios.get('/api/statistics');
+            const stats = response.data.statistics;
+            
+            // Update risk counts
+            document.getElementById('high-risk-count').textContent = stats.high_risk_count || 0;
+            document.getElementById('medium-risk-count').textContent = stats.medium_risk_count || 0;
+            document.getElementById('low-risk-count').textContent = stats.low_risk_count || 0;
+            
+            // Load high risk companies
+            loadHighRiskCompanies();
+            
+            // Load risk factors
+            loadRiskFactors();
+            
+        } catch (error) {
+            console.error('Error loading risk data:', error);
+        }
+    }
+
+    async function loadHighRiskCompanies() {
+        try {
+            // Filter companies with high risk
+            const highRiskCompanies = allCompanies.filter(c => c.risk_score >= 7);
+            
+            const tbody = document.getElementById('highRiskTable');
+            tbody.innerHTML = '';
+            
+            if (highRiskCompanies.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No high risk companies</td></tr>';
+            } else {
+                highRiskCompanies.forEach(company => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${company.name}</strong></td>
+                        <td>${company.ticker || 'N/A'}</td>
+                        <td>${company.industry || 'N/A'}</td>
+                        <td>
+                            <span class="badge bg-danger">
+                                ${(company.risk_score || 0).toFixed(2)}
+                            </span>
+                        </td>
+                        <td>
+                            <small>High Debt, Low Liquidity</small>
+                        </td>
+                        <td>
+                            <a href="/dashboard/analysis?company=${company.id}" class="btn btn-sm btn-danger">
+                                Investigate
+                            </a>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading high risk companies:', error);
+        }
+    }
+
+    function loadRiskFactors() {
+        const factors = [
+            { name: 'High Debt Ratio', count: 8 },
+            { name: 'Declining Revenue', count: 6 },
+            { name: 'Low Liquidity', count: 5 },
+            { name: 'Negative Cash Flow', count: 4 },
+            { name: 'Poor Profitability', count: 3 }
+        ];
+        
+        const factorsList = document.getElementById('riskFactorsList');
+        factorsList.innerHTML = '';
+        
+        factors.forEach(factor => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            item.innerHTML = `
+                <span>${factor.name}</span>
+                <span class="badge bg-danger rounded-pill">${factor.count}</span>
+            `;
+            factorsList.appendChild(item);
+        });
+    }
+
+    function initializeRiskCharts() {
+        // Risk Matrix Chart
+        const matrixCtx = document.getElementById('riskMatrixChart').getContext('2d');
+        new Chart(matrixCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'High Risk',
+                        data: generateScatterData(8, 10, 10),
+                        backgroundColor: 'rgba(220, 53, 69, 0.5)',
+                        borderColor: '#dc3545',
+                        radius: 8
+                    },
+                    {
+                        label: 'Medium Risk',
+                        data: generateScatterData(4, 7, 10),
+                        backgroundColor: 'rgba(255, 193, 7, 0.5)',
+                        borderColor: '#ffc107',
+                        radius: 8
+                    },
+                    {
+                        label: 'Low Risk',
+                        data: generateScatterData(0, 4, 10),
+                        backgroundColor: 'rgba(25, 135, 84, 0.5)',
+                        borderColor: '#198754',
+                        radius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Financial Stress Index'
+                        },
+                        min: 0,
+                        max: 10
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Risk Score'
+                        },
+                        min: 0,
+                        max: 10
+                    }
+                }
+            }
+        });
+
+        // Risk Trend Chart
+        const trendCtx = document.getElementById('riskTrendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [
+                    {
+                        label: 'Average Risk Score',
+                        data: [4.2, 4.5, 4.8, 5.1, 5.3, 5.6],
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            }
+        });
+    }
+
+    function generateScatterData(min, max, count) {
+        const data = [];
+        for (let i = 0; i < count; i++) {
+            data.push({
+                x: Math.random() * 8,
+                y: Math.random() * (max - min) + min
+            });
+        }
+        return data;
+    }
+
+    // Filter change handlers
+    document.getElementById('riskFilterLevel').addEventListener('change', loadRiskData);
+    document.getElementById('riskFilterIndustry').addEventListener('change', loadRiskData);
+    document.getElementById('riskFilterCountry').addEventListener('change', loadRiskData);
+</script>
+{% endblock %}

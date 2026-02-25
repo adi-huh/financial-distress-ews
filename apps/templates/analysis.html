@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Results - Financial Distress EWS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold mb-2">Analysis Results</h1>
+            <p class="text-muted">View detailed analysis results and financial metrics</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Company</label>
+                            <select class="form-select" id="analysisCompanyFilter">
+                                <option value="">All Companies</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Analysis Type</label>
+                            <select class="form-select" id="analysisTypeFilter">
+                                <option value="">All Types</option>
+                                <option value="general">General</option>
+                                <option value="ratio">Ratio</option>
+                                <option value="risk">Risk</option>
+                                <option value="trend">Trend</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Sort By</label>
+                            <select class="form-select" id="analysisSortBy">
+                                <option value="recent">Most Recent</option>
+                                <option value="riskHigh">Highest Risk</option>
+                                <option value="riskLow">Lowest Risk</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Analysis Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="analysisContainer">
+                        <div class="text-center text-muted">Loading analyses...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Detail Modal -->
+<div class="modal fade" id="analysisModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="analysisModalTitle">Analysis Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="analysisModalBody">
+                Loading...
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="exportAnalysisBtn">
+                    <i class="bi bi-download"></i> Export PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allAnalyses = [];
+    const analysisModal = new bootstrap.Modal(document.getElementById('analysisModal'));
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            showLoading();
+            
+            // Load companies for filter
+            const companiesResponse = await axios.get('/api/companies?limit=100');
+            const companies = companiesResponse.data.companies;
+            
+            const companySelect = document.getElementById('analysisCompanyFilter');
+            companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.name;
+                companySelect.appendChild(option);
+            });
+            
+            // Load analyses
+            await loadAnalyses();
+            
+        } catch (error) {
+            console.error('Error loading page:', error);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    async function loadAnalyses() {
+        try {
+            const response = await axios.get('/api/analyses');
+            allAnalyses = response.data.analyses || [];
+            
+            displayAnalyses(allAnalyses);
+        } catch (error) {
+            console.error('Error loading analyses:', error);
+            document.getElementById('analysisContainer').innerHTML = 
+                '<div class="alert alert-danger">Error loading analyses</div>';
+        }
+    }
+
+    function displayAnalyses(analyses) {
+        const container = document.getElementById('analysisContainer');
+        
+        if (analyses.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted">No analyses found</div>';
+            return;
+        }
+
+        container.innerHTML = analyses.map((analysis, index) => `
+            <div class="card mb-3" style="border-left: 4px solid ${getRiskColor(analysis.risk_score)}">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="card-title">${analysis.company_name}</h6>
+                            <p class="mb-1">
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar"></i> 
+                                    ${new Date(analysis.created_at).toLocaleDateString()}
+                                </small>
+                            </p>
+                            <p class="mb-0">
+                                <small>
+                                    <strong>Type:</strong> ${analysis.analysis_type || 'General'}
+                                </small>
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h5 class="mb-0">
+                                    <span class="badge ${getRiskBadgeClass(analysis.risk_score)}">
+                                        ${(analysis.risk_score || 0).toFixed(2)}
+                                    </span>
+                                </h5>
+                                <small class="text-muted">Risk Score</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewAnalysisDetail(${analysis.id})">
+                                <i class="bi bi-eye"></i> View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function viewAnalysisDetail(analysisId) {
+        try {
+            showLoading();
+            
+            const response = await axios.get(`/api/analyses/${analysisId}`);
+            const analysis = response.data;
+            
+            // Populate modal
+            document.getElementById('analysisModalTitle').textContent = 
+                `Analysis Results - ${analysis.company_name}`;
+            
+            const modalBody = document.getElementById('analysisModalBody');
+            modalBody.innerHTML = `
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Company:</strong><br>${analysis.company_name}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Analysis Date:</strong><br>${new Date(analysis.created_at).toLocaleDateString()}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Risk Score:</strong><br>
+                        <span class="badge ${getRiskBadgeClass(analysis.risk_score)}">
+                            ${(analysis.risk_score || 0).toFixed(2)}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <strong>Analysis Type:</strong> ${analysis.analysis_type || 'General'}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Summary:</strong>
+                        <p>${analysis.summary || 'No summary available'}</p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Key Findings:</strong>
+                        <ul>
+                            <li>Financial metrics analyzed</li>
+                            <li>Risk factors identified</li>
+                            <li>Recommendations provided</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            // Store current analysis for export
+            window.currentAnalysisId = analysisId;
+            
+            analysisModal.show();
+            
+        } catch (error) {
+            console.error('Error loading analysis:', error);
+            alert('Error loading analysis details');
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function getRiskColor(score) {
+        if (score >= 7) return '#dc3545';
+        if (score >= 4) return '#ffc107';
+        return '#198754';
+    }
+
+    function getRiskBadgeClass(score) {
+        if (score >= 7) return 'bg-danger';
+        if (score >= 4) return 'bg-warning';
+        return 'bg-success';
+    }
+
+    // Filter handlers
+    document.getElementById('analysisCompanyFilter').addEventListener('change', filterAnalyses);
+    document.getElementById('analysisTypeFilter').addEventListener('change', filterAnalyses);
+    document.getElementById('analysisSortBy').addEventListener('change', filterAnalyses);
+
+    function filterAnalyses() {
+        let filtered = allAnalyses;
+        
+        const companyId = document.getElementById('analysisCompanyFilter').value;
+        if (companyId) {
+            filtered = filtered.filter(a => a.company_id == companyId);
+        }
+        
+        const analysisType = document.getElementById('analysisTypeFilter').value;
+        if (analysisType) {
+            filtered = filtered.filter(a => a.analysis_type === analysisType);
+        }
+        
+        // Sort
+        const sortBy = document.getElementById('analysisSortBy').value;
+        if (sortBy === 'riskHigh') {
+            filtered.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0));
+        } else if (sortBy === 'riskLow') {
+            filtered.sort((a, b) => (a.risk_score || 0) - (b.risk_score || 0));
+        } else {
+            filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        }
+        
+        displayAnalyses(filtered);
+    }
+
+    // Export handler
+    document.getElementById('exportAnalysisBtn').addEventListener('click', async function() {
+        try {
+            const response = await axios.get(`/api/analyses/${window.currentAnalysisId}/export`, {
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'analysis.pdf');
+            document.body.appendChild(link);
+            link.click();
+            link.parentElement.removeChild(link);
+            
+        } catch (error) {
+            console.error('Error exporting analysis:', error);
+            alert('Error exporting analysis');
+        }
+    });
+</script>
+{% endblock %}
