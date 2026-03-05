@@ -452,6 +452,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**⭐ If you find this project useful, please star it on GitHub!**
-
 Last Updated: February 2024

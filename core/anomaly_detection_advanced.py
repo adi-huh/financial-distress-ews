@@ -2,7 +2,6 @@
 Advanced Anomaly Detection Module - Day 5
 Comprehensive anomaly detection with multiple algorithms, categorization, and forecasting.
 """
-
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
