@@ -1,4 +1,4 @@
-# 🚨 Quantitative Early Warning System for Corporate Financial Distress
+#  Quantitative Early Warning System for Corporate Financial Distress
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -8,7 +8,7 @@ A comprehensive software system that analyzes multi-year financial data to detec
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -25,7 +25,7 @@ A comprehensive software system that analyzes multi-year financial data to detec
 
 ---
 
-## 🎯 Overview
+##  Overview
 
 This system helps financial analysts, investors, and corporate managers identify companies at risk of financial distress **before** it becomes critical. By analyzing historical financial data and computing 20+ financial ratios, the system:
 
@@ -42,7 +42,7 @@ This system helps financial analysts, investors, and corporate managers identify
 
 ---
 
-## ✨ Features
+##  Features
 
 ### Core Analytics
 - **20+ Financial Ratios**: Liquidity, Solvency, Profitability, Efficiency, Growth
